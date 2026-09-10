@@ -115,3 +115,4 @@ Workflow em [`.github/workflows/ci.yml`](.github/workflows/ci.yml), GitHub Actio
   recurso, região, ARN ou credencial para preencher este repositório antes da hora.
 - **Ambiente de homologação**: em aberto (ver ADR-005 do repositório da aplicação) — depende do
   crédito disponível na conta de nuvem usada no projeto.
+
