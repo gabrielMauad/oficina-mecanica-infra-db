@@ -88,10 +88,12 @@ implícito da conta, cuja existência não temos como confirmar sem `apply`.
 Esse é o ponto mais provável de quebra entre os dois repositórios: se `infra-k8s` renomear ou
 remover algum desses outputs, o `plan` deste repositório falha ao resolver os data sources.
 
-A security group da Function `oficina-mecanica-lambda-auth` **não** tem, ainda, um contrato formal
-via `terraform_remote_state` — não existe hoje um repositório de infraestrutura Terraform para a
-Lambda. Por isso ele entra como variável (`lambda_security_group_id`, `variables.tf`), a ser
-informada manualmente (ou via secret/variável de CI) quando esse SG existir.
+O acesso da Function `oficina-mecanica-lambda-auth` à porta 5432 **não** é concedido por este
+repositório. O security group da Lambda nasce no próprio repositório
+`oficina-mecanica-lambda-auth`, então a regra de ingress também é declarada lá — ela lê
+`db_security_group_id` (ver "Expostos" abaixo) via `terraform_remote_state` e cria a regra
+apontando para o SG do RDS. Manter a variável `lambda_security_group_id` aqui obrigaria um re-apply
+cruzado entre repositórios toda vez que o SG da Lambda mudasse.
 
 ### Expostos (para quem consumir o state deste repositório, key `infra-db/terraform.tfstate`)
 
@@ -143,8 +145,6 @@ terraform apply \
 ```
 
 `infra_k8s_state_bucket` é obrigatória (sem default) — ver [Contrato de outputs](#contrato-de-outputs).
-`lambda_security_group_id` é opcional; sem ela, a regra de ingress para a Lambda simplesmente não é
-criada (ver `network.tf`).
 
 ## Passos de deploy
 
@@ -209,8 +209,12 @@ apply:   oficina-mecanica-infra-k8s →  oficina-mecanica-infra-db
   `storage_encrypted = true` (`rds.tf`) funciona com a chave gerenciada `aws/rds` — deveria funcionar
   numa conta padrão, mas é um ponto de falha possível numa conta restrita como o Learner Lab; se
   falhar, desligar é uma linha; (4) o `apply` de ponta a ponta.
-- **`lambda_security_group_id` como variável, não remote state.** Não existe hoje um repositório de
-  infraestrutura Terraform para `oficina-mecanica-lambda-auth` com um output formal para consumir —
-  ver [Contrato de outputs](#contrato-de-outputs).
+- **A regra de ingress da Lambda não vive aqui.** Este repositório teve, por um tempo, uma regra
+  condicional (`count` sobre uma variável `lambda_security_group_id` que nunca chegou a ser
+  definida — não existe no state real). Ela foi removida: o security group da Lambda nasce no
+  repositório `oficina-mecanica-lambda-auth`, então é lá que a regra de ingress para 5432 é
+  declarada agora, lendo `db_security_group_id` (ver [Contrato de outputs](#contrato-de-outputs))
+  via `terraform_remote_state`. Como a regra tinha `count = 0` no state real, removê-la não altera
+  nenhum recurso no próximo `apply`.
 - **Ambiente de homologação**: em aberto (ver ADR-005 do repositório da aplicação) — depende do
   crédito disponível na conta de nuvem usada no projeto.

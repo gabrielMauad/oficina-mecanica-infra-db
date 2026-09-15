@@ -69,4 +69,3 @@ jobs:
         run: terraform apply -auto-approve
         env:
           TF_VAR_infra_k8s_state_bucket: ${{ vars.TF_STATE_BUCKET }}
-          TF_VAR_lambda_security_group_id: ${{ vars.LAMBDA_SECURITY_GROUP_ID }}

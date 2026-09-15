@@ -82,15 +82,3 @@ variable "infra_k8s_state_key" {
   type        = string
   default     = "infra-k8s/terraform.tfstate"
 }
-
-variable "lambda_security_group_id" {
-  description = <<-EOT
-    Security group da Function oficina-mecanica-lambda-auth, autorizado a acessar a porta 5432.
-    Ainda não existe, no repositório da Lambda, um Terraform com output formal para consumir via
-    terraform_remote_state (ver README, seção "Contrato de outputs consumidos") — por isso entra
-    como variável, informada manualmente (tfvars ou -var em CI) quando esse SG existir. Deixe
-    null (padrão) para não abrir a porta 5432 para a Lambda ainda.
-  EOT
-  type        = string
-  default     = null
-}
