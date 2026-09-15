@@ -204,7 +204,8 @@ apply:   oficina-mecanica-infra-k8s →  oficina-mecanica-infra-db
   `terraform validate` passa porque data sources e o `terraform_remote_state` só são resolvidos no
   `plan`. Falta validar, quando a sessão do Learner Lab estiver ativa e `infra-k8s` já tiver sido
   aplicado: (1) se os nomes de output realmente batem com o contrato assumido; (2) se a
-  engine_version do PostgreSQL (`16.4`) ainda está disponível em `us-east-1`; (3) se
+  engine_version do PostgreSQL (agora fixada só na major version, `16` — ver `variables.tf`) resolve
+  corretamente em `us-east-1`; (3) se
   `storage_encrypted = true` (`rds.tf`) funciona com a chave gerenciada `aws/rds` — deveria funcionar
   numa conta padrão, mas é um ponto de falha possível numa conta restrita como o Learner Lab; se
   falhar, desligar é uma linha; (4) o `apply` de ponta a ponta.

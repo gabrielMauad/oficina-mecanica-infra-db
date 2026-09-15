@@ -33,9 +33,16 @@ variable "db_username" {
 }
 
 variable "db_engine_version" {
-  description = "Versão do PostgreSQL (RFC-003 decide o motor; ajustar aqui se a AWS deixar de oferecer esta minor version na região)."
+  description = <<-EOT
+    Versão do PostgreSQL (RFC-003 decide o motor). Informar apenas a major version (ex.: "16"),
+    nunca pinar uma minor (ex.: "16.4"): o apply já falhou com
+    "InvalidParameterCombination: Cannot find version 16.4 for postgres" porque a AWS aposenta
+    minor versions do catálogo com o tempo. Com só a major version, o RDS seleciona a minor mais
+    recente disponível; o provider trata engine_version como prefixo (não acusa drift quando a
+    instância real vira "16.x") e expõe o valor efetivo em aws_db_instance.engine_version_actual.
+  EOT
   type        = string
-  default     = "16.4"
+  default     = "16"
 }
 
 variable "db_instance_class" {
