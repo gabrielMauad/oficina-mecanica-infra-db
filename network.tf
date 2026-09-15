@@ -24,20 +24,11 @@ resource "aws_security_group_rule" "postgres_from_eks" {
   description              = "Cluster EKS (oficina-mecanica-infra-k8s)"
 }
 
-# Condicional: o repositório da Lambda ainda não expõe um security group formal (ver
-# variables.tf, lambda_security_group_id). Enquanto isso não existir, esta regra não é criada.
-resource "aws_security_group_rule" "postgres_from_lambda" {
-  count = var.lambda_security_group_id != null && var.lambda_security_group_id != "" ? 1 : 0
-
-  type                     = "ingress"
-  from_port                = 5432
-  to_port                  = 5432
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.rds.id
-  source_security_group_id = var.lambda_security_group_id
-  description              = "Function oficina-mecanica-lambda-auth"
-}
-
+# A regra que libera a porta 5432 para a Function oficina-mecanica-lambda-auth NÃO é criada aqui.
+# O security group da Lambda nasce no próprio repositório oficina-mecanica-lambda-auth, então a
+# regra de ingress também é declarada lá (lendo db_security_group_id deste repositório via
+# terraform_remote_state) — evita um re-apply cruzado entre repositórios toda vez que o SG da
+# Lambda mudar. Ver README, seção "Contrato de outputs".
 resource "aws_security_group_rule" "egress_all" {
   type              = "egress"
   from_port         = 0
