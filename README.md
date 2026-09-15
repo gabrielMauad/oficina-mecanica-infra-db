@@ -21,6 +21,7 @@ pós-graduação em Arquitetura de Software (FIAP/SOAT), Fase 3.
 - [Instruções de execução](#instruções-de-execução)
 - [Passos de deploy](#passos-de-deploy)
 - [Explicação da pipeline](#explicação-da-pipeline)
+- [Custo estimado e ordem de destruição](#custo-estimado-e-ordem-de-destruição)
 - [Decisões e pontos em aberto](#decisões-e-pontos-em-aberto)
 
 ---
@@ -46,9 +47,9 @@ Secrets Manager — nunca em texto puro.
 ```mermaid
 flowchart LR
     subgraph Nuvem["AWS Academy Learner Lab — us-east-1"]
-        K8S["Cluster Kubernetes<br/>oficina-mecanica-infra-k8s<br/>(VPC/subnets/SG consumidos daqui)"]
+        K8S["Cluster Kubernetes<br/>oficina-mecanica-infra-k8s<br/>(VPC default/subnets/SG consumidos daqui)"]
         LAMBDA["Function de autenticação<br/>oficina-mecanica-lambda-auth"]
-        subgraph DBNET["Rede privada do banco — este repositório"]
+        subgraph DBNET["DB subnet group — este repositório<br/>(subnets da VPC default, publicas)"]
             DB[("Amazon RDS PostgreSQL 16<br/>db.t3.micro, gp2 20 GB, single-AZ")]
         end
         SECRETS[["AWS Secrets Manager"]]
@@ -72,6 +73,17 @@ Este repositório não cria VPC nem subnets — ele lê o state de `oficina-meca
 | `vpc_id` | `vpc_id` do security group do RDS |
 | `private_subnet_ids` | subnets do `aws_db_subnet_group` |
 | `cluster_security_group_id` | origem liberada na regra de ingress 5432 (cluster EKS) |
+
+`vpc_id` e `private_subnet_ids` agora vêm da **VPC default** da conta (`oficina-mecanica-infra-k8s`
+não cria mais VPC própria — ver RFC-002 e o README daquele repositório). O nome
+`private_subnet_ids` foi mantido por estabilidade do contrato entre os dois repositórios, mas as
+subnets em si são públicas. Isso não expõe o banco: `aws_db_instance.this.publicly_accessible =
+false` (`rds.tf`) já impede endereço público, e o security group dedicado (`aws_security_group.rds`,
+`network.tf`) só libera a porta 5432 a partir do security group do cluster EKS — nunca da internet.
+Avaliamos usar o DB subnet group `default` que a AWS cria automaticamente para toda VPC default, em
+vez de criar um (`aws_db_subnet_group.this`); optamos por manter a criação própria porque preserva
+o contrato de outputs já documentado (`private_subnet_ids`) sem depender de um nome de recurso
+implícito da conta, cuja existência não temos como confirmar sem `apply`.
 
 Esse é o ponto mais provável de quebra entre os dois repositórios: se `infra-k8s` renomear ou
 remover algum desses outputs, o `plan` deste repositório falha ao resolver os data sources.
@@ -163,17 +175,39 @@ Workflow em [`.github/workflows/ci.yml`](.github/workflows/ci.yml), GitHub Actio
   -auto-approve`. `workflow_dispatch` existe especificamente para permitir reexecutar o apply
   depois de renovar as credenciais da sessão, sem precisar de um commit novo.
 
+## Custo estimado e ordem de destruição
+
+Ambiente efêmero (RFC-002 §6.3): provisionar, validar/gravar a demonstração e destruir — não manter
+no ar entre sessões. O que cobra por hora mesmo com a aplicação parada:
+
+| Recurso | Custo aproximado | Observação |
+|---|---|---|
+| RDS PostgreSQL (`db.t3.micro`, 20 GB gp2) | Instância On-Demand + armazenamento | Cobra enquanto a instância existir, mesmo sem conexões. Uma instância **parada** é religada automaticamente pela AWS após 7 dias (RFC-002 §6.3) — parar não é uma forma de reduzir custo por muito tempo; `destroy` é. |
+| Secrets Manager (`aws_secretsmanager_secret.db`) | ~US$ 0,40/mês por secret | Baixo, mas contínuo enquanto o secret existir. `recovery_window_in_days = 0` faz o `destroy` remover o secret imediatamente, sem janela de retenção. |
+
+**Ordem de destruição:** este repositório (`infra-db`) **antes** de `oficina-mecanica-infra-k8s`.
+Este repositório consome VPC/subnets/security group do `infra-k8s` via `terraform_remote_state`;
+destruir o `infra-k8s` primeiro deixaria o RDS órfão (rede/SG apontando para recursos inexistentes)
+e o `terraform destroy` deste repositório provavelmente falharia ao tentar resolver o remote state.
+
+```
+destroy: oficina-mecanica-infra-db  →  oficina-mecanica-infra-k8s
+apply:   oficina-mecanica-infra-k8s →  oficina-mecanica-infra-db
+```
+
 ## Decisões e pontos em aberto
 
 - **Sem Dockerfile.** A orientação oficial da fase é incluir `Dockerfile` só onde for tecnicamente
   necessário; um repositório composto apenas de Terraform não roda nada em contêiner. Decisão, não
   esquecimento.
-- **`plan`/`apply` não foram executados nesta entrega.** Esta sessão não tem credenciais AWS, e o
-  state de `oficina-mecanica-infra-k8s` (de onde vem a VPC) ainda não existe — aquele repositório
-  está sendo escrito em paralelo. `terraform validate` passa porque data sources só são resolvidos
-  no `plan`. Falta validar, quando a sessão do Learner Lab e o state de `infra-k8s` existirem: (1)
-  se os nomes de output realmente batem com o contrato assumido; (2) se a engine_version do
-  PostgreSQL (`16.4`) ainda está disponível em `us-east-1`; (3) o `apply` de ponta a ponta.
+- **`plan`/`apply` não foram executados nesta entrega.** Esta sessão não tem credenciais AWS ativas.
+  `terraform validate` passa porque data sources e o `terraform_remote_state` só são resolvidos no
+  `plan`. Falta validar, quando a sessão do Learner Lab estiver ativa e `infra-k8s` já tiver sido
+  aplicado: (1) se os nomes de output realmente batem com o contrato assumido; (2) se a
+  engine_version do PostgreSQL (`16.4`) ainda está disponível em `us-east-1`; (3) se
+  `storage_encrypted = true` (`rds.tf`) funciona com a chave gerenciada `aws/rds` — deveria funcionar
+  numa conta padrão, mas é um ponto de falha possível numa conta restrita como o Learner Lab; se
+  falhar, desligar é uma linha; (4) o `apply` de ponta a ponta.
 - **`lambda_security_group_id` como variável, não remote state.** Não existe hoje um repositório de
   infraestrutura Terraform para `oficina-mecanica-lambda-auth` com um output formal para consumir —
   ver [Contrato de outputs](#contrato-de-outputs).
