@@ -6,8 +6,9 @@ resource "aws_db_subnet_group" "this" {
 }
 
 resource "aws_security_group" "rds" {
-  name        = "${var.project_name}-${var.environment}-rds"
-  description = "Permite PostgreSQL (5432) apenas a partir do cluster EKS e da Function de autenticação."
+  name = "${var.project_name}-${var.environment}-rds"
+  # GroupDescription so aceita ASCII (exigencia da API da AWS) - nao reintroduzir acentos aqui.
+  description = "Permite PostgreSQL (5432) apenas a partir do cluster EKS e da Function de autenticacao."
   vpc_id      = local.vpc_id
 
   tags = local.common_tags
