@@ -1,5 +1,22 @@
+# Uma instância RDS por serviço com banco relacional. Cada serviço é dono dos seus dados e tem
+# credencial própria; o isolamento é feito só com Terraform (instância + senha + secret), sem
+# criar databases ou usuários por SQL numa rede privada.
+#
+# A chave do mapa é o nome do serviço (usado no identifier da instância e no path do secret);
+# `db_name` é o database criado dentro da instância. Os schemas de cada módulo continuam os
+# mesmos dentro do database — as migrations das aplicações não mudam.
+locals {
+  bancos = {
+    "cadastro"       = { db_name = "cadastro" }
+    "pecas-insumos"  = { db_name = "pecas_insumos" }
+    "ordens-servico" = { db_name = "ordens_servico" }
+  }
+}
+
 resource "aws_db_instance" "this" {
-  identifier     = "${var.project_name}-${var.environment}"
+  for_each = local.bancos
+
+  identifier     = "${var.project_name}-${var.environment}-${each.key}"
   engine         = "postgres"
   engine_version = var.db_engine_version
 
@@ -8,9 +25,9 @@ resource "aws_db_instance" "this" {
   storage_type      = "gp2"
   storage_encrypted = true
 
-  db_name  = var.db_name
+  db_name  = each.value.db_name
   username = var.db_username
-  password = random_password.db.result
+  password = random_password.db[each.key].result
   port     = 5432
 
   db_subnet_group_name   = aws_db_subnet_group.this.name
@@ -35,5 +52,5 @@ resource "aws_db_instance" "this" {
   deletion_protection = false
   apply_immediately   = true
 
-  tags = local.common_tags
+  tags = merge(local.common_tags, { Service = each.key })
 }

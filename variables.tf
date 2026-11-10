@@ -16,18 +16,8 @@ variable "environment" {
   default     = "dev"
 }
 
-variable "db_name" {
-  description = <<-EOT
-    Nome do banco inicial criado no RDS. Os três bounded contexts da aplicação (cadastro,
-    ordem_servico, pecas_insumos) vivem como schemas dentro dele, não como bancos separados
-    (RFC-003 §4.1) — mesmo nome já usado em docker-compose.yml e nos manifests k8s da Fase 2.
-  EOT
-  type        = string
-  default     = "oficina_mecanica"
-}
-
 variable "db_username" {
-  description = "Usuário master do RDS."
+  description = "Usuário master de cada instância RDS (a senha é gerada por instância)."
   type        = string
   default     = "oficina"
 }
@@ -46,13 +36,13 @@ variable "db_engine_version" {
 }
 
 variable "db_instance_class" {
-  description = "Classe da instância. A conta AWS Academy só permite classes burstable até 'medium' (RFC-002 §6.2)."
+  description = "Classe de cada instância. A conta AWS Academy só permite classes burstable até 'medium' (RFC-002 §6.2)."
   type        = string
   default     = "db.t3.micro"
 }
 
 variable "db_allocated_storage" {
-  description = "Armazenamento em GB (gp2). A conta AWS Academy permite até 100 GB, sem PIOPS (RFC-002 §6.2)."
+  description = "Armazenamento em GB de cada instância (gp2). A conta AWS Academy permite até 100 GB, sem PIOPS (RFC-002 §6.2)."
   type        = number
   default     = 20
 }
