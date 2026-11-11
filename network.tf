@@ -8,7 +8,11 @@ resource "aws_db_subnet_group" "this" {
 resource "aws_security_group" "rds" {
   name = "${var.project_name}-${var.environment}-rds"
   # GroupDescription so aceita ASCII (exigencia da API da AWS) - nao reintroduzir acentos aqui.
-  description = "Permite PostgreSQL (5432) apenas a partir do cluster EKS."
+  # O texto abaixo ficou desatualizado (cita a Function de autenticacao, que nao acessa mais o
+  # banco), mas e mantido de proposito: "description" forca a recriacao do security group, o que
+  # destruiria e recriaria tambem as regras dependentes e arriscaria DependencyViolation com as
+  # interfaces de rede do RDS. A restricao real (somente o cluster EKS) esta na regra de ingress.
+  description = "Permite PostgreSQL (5432) apenas a partir do cluster EKS e da Function de autenticacao."
   vpc_id      = local.vpc_id
 
   tags = local.common_tags

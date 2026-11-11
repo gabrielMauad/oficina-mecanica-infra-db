@@ -256,7 +256,7 @@ apply:   oficina-mecanica-infra-k8s →  oficina-mecanica-infra-db
   destrói ambos e cria as três instâncias novas; os dados da instância antiga não são migrados
   (ambiente descartável, RFC-002 §6.3). Os outputs antigos (`db_endpoint`, `db_address`, `db_port`,
   `db_name`, `db_secret_arn`) deixam de existir e foram substituídos por `databases`. O security
-  group é recriado (a descrição mudou), então o valor de `db_security_group_id` muda.
+  group é atualizado no lugar (nome e descrição inalterados), então `db_security_group_id` não muda.
 - **Nenhuma regra de ingress para a Lambda.** A Function de autenticação não acessa mais banco; se
   o repositório `oficina-mecanica-lambda-auth` ainda declarar uma regra de ingress para 5432 lendo
   `db_security_group_id`, ela precisa ser removida lá.
