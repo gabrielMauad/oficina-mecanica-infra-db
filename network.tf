@@ -8,6 +8,10 @@ resource "aws_db_subnet_group" "this" {
 resource "aws_security_group" "rds" {
   name = "${var.project_name}-${var.environment}-rds"
   # GroupDescription so aceita ASCII (exigencia da API da AWS) - nao reintroduzir acentos aqui.
+  # O texto abaixo ficou desatualizado (cita a Function de autenticacao, que nao acessa mais o
+  # banco), mas e mantido de proposito: "description" forca a recriacao do security group, o que
+  # destruiria e recriaria tambem as regras dependentes e arriscaria DependencyViolation com as
+  # interfaces de rede do RDS. A restricao real (somente o cluster EKS) esta na regra de ingress.
   description = "Permite PostgreSQL (5432) apenas a partir do cluster EKS e da Function de autenticacao."
   vpc_id      = local.vpc_id
 
@@ -24,11 +28,9 @@ resource "aws_security_group_rule" "postgres_from_eks" {
   description              = "Cluster EKS (oficina-mecanica-infra-k8s)"
 }
 
-# A regra que libera a porta 5432 para a Function oficina-mecanica-lambda-auth NÃO é criada aqui.
-# O security group da Lambda nasce no próprio repositório oficina-mecanica-lambda-auth, então a
-# regra de ingress também é declarada lá (lendo db_security_group_id deste repositório via
-# terraform_remote_state) — evita um re-apply cruzado entre repositórios toda vez que o SG da
-# Lambda mudar. Ver README, seção "Contrato de outputs".
+# Subnet group e security group são compartilhados pelas instâncias RDS de todos os serviços.
+# Nenhum outro cliente acessa o banco: a Function de autenticação por CPF não usa mais banco
+# (consulta o serviço de Cadastro por HTTP).
 resource "aws_security_group_rule" "egress_all" {
   type              = "egress"
   from_port         = 0

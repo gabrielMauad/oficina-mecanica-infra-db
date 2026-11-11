@@ -1,29 +1,27 @@
-output "db_endpoint" {
-  description = "Endpoint (host:port) do RDS PostgreSQL."
-  value       = aws_db_instance.this.endpoint
-}
-
-output "db_address" {
-  description = "Hostname do RDS PostgreSQL, sem a porta."
-  value       = aws_db_instance.this.address
-}
-
-output "db_port" {
-  description = "Porta do RDS PostgreSQL."
-  value       = aws_db_instance.this.port
-}
-
-output "db_name" {
-  description = "Nome do banco inicial no RDS (os bounded contexts vivem como schemas dentro dele — RFC-003 §4.1)."
-  value       = aws_db_instance.this.db_name
-}
-
-output "db_secret_arn" {
-  description = "ARN do secret no Secrets Manager com username/password/host/port/dbname. Nunca a senha em texto puro neste output."
-  value       = aws_secretsmanager_secret.db.arn
+output "databases" {
+  description = "Mapa por serviço (cadastro, pecas-insumos, ordens-servico) com endpoint (host:port), address, port, db_name e secret_arn do RDS PostgreSQL do serviço. Nunca a senha — ela só existe no secret."
+  value = {
+    for servico, db in aws_db_instance.this : servico => {
+      endpoint   = db.endpoint
+      address    = db.address
+      port       = db.port
+      db_name    = db.db_name
+      secret_arn = aws_secretsmanager_secret.db[servico].arn
+    }
+  }
 }
 
 output "db_security_group_id" {
-  description = "Security group do RDS — referenciar para quem mais precisar de acesso à porta 5432."
+  description = "Security group compartilhado pelas instâncias RDS — referenciar para quem mais precisar de acesso à porta 5432."
   value       = aws_security_group.rds.id
+}
+
+output "dynamodb_pagamentos_table_name" {
+  description = "Nome da tabela DynamoDB de pagamentos."
+  value       = aws_dynamodb_table.pagamentos.name
+}
+
+output "dynamodb_pagamentos_table_arn" {
+  description = "ARN da tabela DynamoDB de pagamentos."
+  value       = aws_dynamodb_table.pagamentos.arn
 }
